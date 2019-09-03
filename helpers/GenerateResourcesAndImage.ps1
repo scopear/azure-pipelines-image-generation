@@ -5,6 +5,7 @@ enum ImageType {
     VS2019 = 1
     Ubuntu1604 = 2
     WinCon = 3
+    Unity = 4
 }
 
 Function Get-PackerTemplatePath {
@@ -30,6 +31,9 @@ Function Get-PackerTemplatePath {
         ([ImageType]::WinCon) {
             $relativePath = "\images\win\WindowsContainer1803-Azure.json"
         }
+        ([ImageType]::Unity) {
+            $relativePath = "\images\win\Unity.json"
+        }
     }
 
     return $RepositoryRoot + $relativePath;
@@ -53,7 +57,7 @@ Function GenerateResourcesAndImage {
             The root path of the image generation repository source.
 
         .PARAMETER ImageType
-            The type of the image being generated. Valid options are: {"VS2017", "VS2019", "Ubuntu164", "WinCon"}.
+            The type of the image being generated. Valid options are: {"VS2017", "VS2019", "Ubuntu164", "WinCon", "Unity"}.
 
         .PARAMETER AzureLocation
             The location of the resources being created in Azure. For example "East US".
@@ -85,61 +89,66 @@ Function GenerateResourcesAndImage {
     $ServicePrincipalClientSecret = $env:UserName + [System.GUID]::NewGuid().ToString().ToUpper();
     $InstallPassword = $env:UserName + [System.GUID]::NewGuid().ToString().ToUpper();
 
-    Login-AzureRmAccount
+    try
+    {
+        Get-AzureRmContext -ErrorAction Continue
+    }
+    catch [System.Management.Automation.PSInvalidOperationException]
+    {
+        Login-AzureRmAccount
+    }
+
     Set-AzureRmContext -SubscriptionId $SubscriptionId
 
     $alreadyExists = $true;
-    try {
+    try
+    {
         Get-AzureRmResourceGroup -Name $ResourceGroupName
         Write-Verbose "Resource group was found, will delete and recreate it."
     }
-    catch {
+    catch
+    {
         Write-Verbose "Resource group was not found, will create it."
         $alreadyExists = $false;
     }
 
-    if ($alreadyExists) {
-        if($Force -eq $true) {
-            # Cleanup the resource group if it already exitsted before
-            Remove-AzureRmResourceGroup -Name $ResourceGroupName -Force
-            New-AzureRmResourceGroup -Name $ResourceGroupName -Location $AzureLocation
-        } else {
-            $title = "Delete Resource Group"
-            $message = "The resource group you specified already exists. Do you want to clean it up?"
+    # if ($alreadyExists)
+    # {
+    #     if($Force -eq $true)
+    #     {
+    #         # Cleanup the resource group if it already exitsted before
+    #         Remove-AzureRmResourceGroup -Name $ResourceGroupName -Force
+    #         New-AzureRmResourceGroup -Name $ResourceGroupName -Location $AzureLocation
+    #     }
+    #     else
+    #     {
+    #         $title = "Delete Resource Group"
+    #         $message = "The resource group you specified already exists. Do you want to clean it up?"
 
-            $yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes", `
-                "Delete the resource group including all resources."
+    #         $yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes", `
+    #             "Delete the resource group including all resources."
 
-            $no = New-Object System.Management.Automation.Host.ChoiceDescription "&No", `
-                "Keep the resource group and continue."
+    #         $no = New-Object System.Management.Automation.Host.ChoiceDescription "&No", `
+    #             "Keep the resource group and continue."
 
-            $stop = New-Object System.Management.Automation.Host.ChoiceDescription "&Stop", `
-                "Stop the current action."
+    #         $stop = New-Object System.Management.Automation.Host.ChoiceDescription "&Stop", `
+    #             "Stop the current action."
 
-            $options = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no, $stop)
-            $result = $host.ui.PromptForChoice($title, $message, $options, 0)
+    #         $options = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no, $stop)
+    #         $result = $host.ui.PromptForChoice($title, $message, $options, 0)
 
-            switch ($result)
-            {
-                0 { Remove-AzureRmResourceGroup -Name $ResourceGroupName -Force; New-AzureRmResourceGroup -Name $ResourceGroupName -Location $AzureLocation }
-                1 { <# Do nothing #> }
-                2 { exit }
-            }
-        }
-    } else {
-        New-AzureRmResourceGroup -Name $ResourceGroupName -Location $AzureLocation
-    }
-
-    # This script should follow the recommended naming conventions for azure resources
-    $storageAccountName = if($ResourceGroupName.EndsWith("-rg")) {
-        $ResourceGroupName.Substring(0, $ResourceGroupName.Length -3)
-    } else { $ResourceGroupName }
-
-    # Resource group names may contain special characters, that are not allowed in the storage account name
-    $storageAccountName = $storageAccountName.Replace("-", "").Replace("_", "").Replace("(", "").Replace(")", "")
-    $sotrageAccountName += "001"
-
-    New-AzureRmStorageAccount -ResourceGroupName $ResourceGroupName -AccountName $storageAccountName -Location $AzureLocation -SkuName "Standard_LRS"
+    #         switch ($result)
+    #         {
+    #             0 { Remove-AzureRmResourceGroup -Name $ResourceGroupName -Force; New-AzureRmResourceGroup -Name $ResourceGroupName -Location $AzureLocation }
+    #             1 { <# Do nothing #> }
+    #             2 { exit }
+    #         }
+    #     }
+    # }
+    # else
+    # {
+    #     New-AzureRmResourceGroup -Name $ResourceGroupName -Location $AzureLocation
+    # }
 
     $spDisplayName = [System.GUID]::NewGuid().ToString().ToUpper()
     $sp = New-AzureRmADServicePrincipal -DisplayName $spDisplayName -Password (ConvertTo-SecureString $ServicePrincipalClientSecret -AsPlainText -Force)
@@ -155,5 +164,5 @@ Function GenerateResourcesAndImage {
     $tenantId = $sub.TenantId
     # "", "Note this variable-setting script for running Packer with these Azure resources in the future:", "==============================================================================================", "`$spClientId = `"$spClientId`"", "`$ServicePrincipalClientSecret = `"$ServicePrincipalClientSecret`"", "`$SubscriptionId = `"$SubscriptionId`"", "`$tenantId = `"$tenantId`"", "`$spObjectId = `"$spObjectId`"", "`$AzureLocation = `"$AzureLocation`"", "`$ResourceGroupName = `"$ResourceGroupName`"", "`$storageAccountName = `"$storageAccountName`"", "`$install_password = `"$install_password`"", ""
 
-    packer.exe build -on-error=ask -var "client_id=$($spClientId)" -var "client_secret=$($ServicePrincipalClientSecret)" -var "subscription_id=$($SubscriptionId)" -var "tenant_id=$($tenantId)" -var "object_id=$($spObjectId)" -var "location=$($AzureLocation)" -var "resource_group=$($ResourceGroupName)" -var "storage_account=$($storageAccountName)" -var "install_password=$($InstallPassword)" $builderScriptPath
+    packer.exe build -on-error=ask -var "client_id=$($spClientId)" -var "client_secret=$($ServicePrincipalClientSecret)" -var "subscription_id=$($SubscriptionId)" -var "tenant_id=$($tenantId)" -var "object_id=$($spObjectId)" -var "location=$($AzureLocation)" -var "resource_group=$($ResourceGroupName)" -var "install_password=$($InstallPassword)" $builderScriptPath
 }
