@@ -22,7 +22,7 @@
         "install_password": null,
         "capture_name_prefix": "packer",
         "image_version": "dev",
-        "unity_version": "2018.4.7f1"
+        "unity_version": "2018.4.10f1"
     },
     "builders": [
         {
@@ -36,7 +36,7 @@
             "location": "{{user `location`}}",
             "vm_size": "{{user `vm_size`}}",
             "temp_resource_group_name": "{{user `temp_resource_group_name`}}",
-            "managed_image_name": "UnityBuild2018.4.7f1",
+            "managed_image_name": "Unity2018.4.10f1",
             "managed_image_resource_group_name": "{{user `resource_group`}}",
             "virtual_network_name": "{{user `virtual_network_name`}}",
             "virtual_network_resource_group_name": "{{user `virtual_network_resource_group_name`}}",

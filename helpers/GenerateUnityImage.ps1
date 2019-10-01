@@ -24,10 +24,8 @@
         Delete the resource group if it exists without user confirmation.
 
     .EXAMPLE
-        GenerateResourcesAndImage -SubscriptionId {YourSubscriptionId} -ResourceGroupName "shsamytest1" -ImageGenerationRepositoryRoot "C:\azure-pipelines-image-generation" -ImageType Ubuntu1604 -AzureLocation "East US"
+        GenerateResourcesAndImage -SubscriptionId {YourSubscriptionId} -ResourceGroupName "shsamytest1" -ImageGenerationRepositoryRoot "C:\azure-pipelines-image-generation" -AzureLocation "East US"
 #>
-$ErrorActionPreference = 'Stop'
-
 param (
     [Parameter(Mandatory = $True)]
     [string] $SubscriptionId,
@@ -36,8 +34,6 @@ param (
     [Parameter(Mandatory = $True)]
     [string] $ImageGenerationRepositoryRoot,
     [Parameter(Mandatory = $True)]
-    [ImageType] $ImageType,
-    [Parameter(Mandatory = $True)]
     [string] $AzureLocation,
     [Parameter(Mandatory = $False)]
     [int] $SecondsToWaitForServicePrincipalSetup = 30,
@@ -45,9 +41,11 @@ param (
     [Switch] $Force
 )
 
-$relativePath = "\images\Unity2018-VS2017.json"
+$ErrorActionPreference = 'Stop'
 
-$builderScriptPath + $ImageGenerationRepositoryRoot + $relativePath;
+$relativePath = "\images\win\Unity2018-VS2017.json"
+
+$builderScriptPath = $ImageGenerationRepositoryRoot + $relativePath;
 
 $ServicePrincipalClientSecret = $env:UserName + [System.GUID]::NewGuid().ToString().ToUpper();
 $InstallPassword = $env:UserName + [System.GUID]::NewGuid().ToString().ToUpper();
